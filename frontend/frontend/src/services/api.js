@@ -9,11 +9,29 @@ const api = axios.create({
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
-  if (token) {
+  const method = (config.method || 'get').toLowerCase();
+  const url = config.url || '';
+  const isPublicAuthEndpoint =
+    url.startsWith('/auth/login/') || url.startsWith('/auth/register/');
+  const isPublicPropertyRead =
+    method === 'get' && url.startsWith('/properties/');
+  const isPublicAssistantEndpoint = url.startsWith('/chat/assistant/');
+
+  if (token && !isPublicAuthEndpoint && !isPublicPropertyRead && !isPublicAssistantEndpoint) {
     config.headers.Authorization = `Token ${token}`;
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const authAPI = {
   register: (data) => api.post('/auth/register/', data),
@@ -57,6 +75,7 @@ export const bookingsAPI = {
 };
 
 export const chatAPI = {
+  askAssistant: (message, history = []) => api.post('/chat/assistant/', { message, history }),
   getConversations: () => api.get('/chat/conversations/'),
   getConversation: (id) => api.get(`/chat/conversations/${id}/`),
   createConversation: (data) => api.post('/chat/conversations/', data),

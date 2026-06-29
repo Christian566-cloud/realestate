@@ -1,6 +1,9 @@
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
+from rest_framework.views import APIView
+from rest_framework.response import Response
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
+from .assistant import answer_real_estate_question
 
 class IsParticipant(permissions.BasePermission):
     def has_permission(self, request, view):
@@ -44,3 +47,16 @@ class MessageListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         conversation_id = self.kwargs['conversation_id']
         serializer.save(sender=self.request.user, conversation_id=conversation_id)
+
+
+class AssistantChatView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        message = request.data.get('message', '')
+        history = request.data.get('history', [])
+        if not isinstance(message, str):
+            return Response({'error': 'Message must be text.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not isinstance(history, list):
+            history = []
+        return Response(answer_real_estate_question(message, history=history))
